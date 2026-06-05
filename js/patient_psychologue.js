@@ -823,8 +823,6 @@
                 mediaType,
                 vipAnswers: vipAnswers.length > 0 ? vipAnswers : undefined
             });
-            console.log('=== SENDING PAYLOAD:', JSON.stringify(payload));
-
             vipAnswers = [];
             showToast('Rendez-vous réservé avec succès!', 'success');
             closeBookingModal();

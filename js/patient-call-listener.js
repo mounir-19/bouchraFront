@@ -85,23 +85,18 @@
 
             sessionSocket.on('session-started', (data) => {
                 console.log('Real-time session started event:', data);
-                // Update local state
                 window.PatientCallState.currentDoctorId = data.doctorId;
                 window.PatientCallState.activeCallData = data;
                 localStorage.setItem('currentDoctorId', data.doctorId);
-
-                // Trigger immediate UI update
                 checkCallStatus();
             });
 
             sessionSocket.on('session-ended', (data) => {
                 console.log('Real-time session ended event:', data);
-                // Clear local state
                 window.PatientCallState.currentDoctorId = null;
                 window.PatientCallState.activeCallData = null;
                 localStorage.removeItem('currentDoctorId');
 
-                // Trigger immediate UI update
                 if (lastCallActive) {
                     handleCallEnded();
                 }
@@ -109,23 +104,19 @@
                 lastCallStatus = null;
 
                 const callEntry = document.getElementById('patientCallEntry');
-                if (callEntry) {
-                    callEntry.remove();
-                }
+                if (callEntry) callEntry.remove();
             });
 
-            // Doctor accepted patient into the group call — show sidebar entry instead of instant redirect
+            // Doctor accepted patient into the group call
             sessionSocket.on('group:join-accepted', (data) => {
                 console.log('Group join accepted:', data);
                 if (typeof showToast === 'function') {
                     showToast('Vous avez été accepté dans le groupe', 'success');
                 }
-                // Store session info
                 sessionStorage.setItem('groupCallRoom', data.roomId);
                 sessionStorage.setItem('groupCallGroupId', data.groupId);
                 sessionStorage.setItem('groupCallDoctorId', data.doctorId);
                 sessionStorage.setItem('groupCallDoctorName', data.doctorName || 'Psychologue');
-                // Create sidebar entry (like one-to-one call UX)
                 showGroupCallEntry(data);
             });
 
@@ -135,18 +126,13 @@
                 if (typeof showToast === 'function') {
                     showToast('Votre demande d\'adhésion au groupe a été refusée', 'error');
                 }
-                // Dispatch event so therapy page can update UI
-                window.dispatchEvent(new CustomEvent('grouptherapy:data-changed', {
-                    detail: data
-                }));
+                window.dispatchEvent(new CustomEvent('grouptherapy:data-changed', { detail: data }));
             });
 
-            // Group session ended — doctor ended the group call
+            // Group session ended
             sessionSocket.on('group:ended', (data) => {
                 console.log('Group ended:', data);
-                // Remove sidebar entry
                 window.removeGroupCallEntry();
-                // Save for rating modal — only if not already rated
                 if (!isSessionRated(data.groupId, data.doctorId)) {
                     try {
                         sessionStorage.setItem('pendingGroupRating', JSON.stringify({
@@ -157,12 +143,9 @@
                     } catch (e) { }
                 }
                 if (data.disconnect) {
-                    // If currently on the video-call page, the room-closed event handles cleanup
-                    // If on any other page, trigger cleanup via toast + custom event
                     if (typeof showToast === 'function') {
                         showToast('La session de groupe est terminée', 'info');
                     }
-                    // Clear any active group call state
                     sessionStorage.removeItem('groupCallRoom');
                     sessionStorage.removeItem('groupCallGroupId');
                     sessionStorage.removeItem('groupCallDoctorId');
@@ -170,22 +153,17 @@
                 if (typeof handleGroupSessionEnded === 'function') {
                     handleGroupSessionEnded(data);
                 }
-                window.dispatchEvent(new CustomEvent('grouptherapy:session-ended', {
-                    detail: data
-                }));
+                window.dispatchEvent(new CustomEvent('grouptherapy:session-ended', { detail: data }));
             });
 
-            // Group data changed — re-fetch groups on therapy page
+            // Group data changed
             sessionSocket.on('group-data-changed', (data) => {
                 console.log('Group data changed:', data);
-                window.dispatchEvent(new CustomEvent('grouptherapy:data-changed', {
-                    detail: data
-                }));
+                window.dispatchEvent(new CustomEvent('grouptherapy:data-changed', { detail: data }));
             });
 
             sessionSocket.on('disconnect', () => {
                 console.log('Session socket disconnected');
-                // Restart polling fallback when socket disconnects
                 startCallPolling();
             });
 
@@ -254,12 +232,8 @@
             }
             updateCallEntryContent(callEntry, status);
         } else {
-            if (lastCallActive) {
-                handleCallEnded();
-            }
-            if (callEntry) {
-                callEntry.remove();
-            }
+            if (lastCallActive) handleCallEnded();
+            if (callEntry) callEntry.remove();
             lastCallActive = false;
             window.PatientCallState.currentDoctorId = null;
             localStorage.removeItem('currentDoctorId');
@@ -335,16 +309,16 @@
     function updateCallEntryContent(callEntry, status) {
         const doctorName = status.doctorName || 'le Psychologue';
         const doctorEl = callEntry.querySelector('.call-entry-doctor');
-        if (doctorEl) {
-            doctorEl.textContent = `avec ${doctorName}`;
-        }
+        if (doctorEl) doctorEl.textContent = `avec ${doctorName}`;
     }
 
     // ========== GROUP CALL SIDEBAR ENTRY ==========
     window.showGroupCallEntry = function (data) {
         window.removeGroupCallEntry();
 
-        const safeDoctorName = (data.doctorName || 'Psychologue').replace(/[<>&"]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; });
+        const safeDoctorName = (data.doctorName || 'Psychologue').replace(/[<>&"]/g, function (c) {
+            return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c];
+        });
         const joinUrl = `video-call.html?room=${data.roomId || ''}&type=group&groupId=${data.groupId || ''}&doctorId=${data.doctorId || ''}`;
 
         const invite = document.createElement('div');
@@ -406,7 +380,6 @@
         try {
             let status = lastCallStatus;
 
-            // Get current status from API
             if (!status || !status.inCall) {
                 status = appointmentAPI?.getMyCallStatus
                     ? await appointmentAPI.getMyCallStatus()
@@ -416,7 +389,6 @@
             }
 
             if (status?.inCall && status.appointmentId) {
-                // Redirect to dedicated video call page
                 const roomId = status.appointmentId;
                 window.location.href = `video-call.html?room=${roomId}&appointment=${status.appointmentId}&type=patient`;
                 return;
@@ -433,17 +405,13 @@
         }
     };
 
-    window.initPatientCallListener = initPatientCallListener;
-
     function handleCallEnded() {
         if (typeof leavePatientSession === 'function') {
             leavePatientSession();
         }
 
         const activeSessionSection = document.getElementById('activeSessionSection');
-        if (activeSessionSection) {
-            activeSessionSection.style.display = 'none';
-        }
+        if (activeSessionSection) activeSessionSection.style.display = 'none';
 
         sessionStorage.removeItem('joinCall');
         sessionStorage.removeItem('joinCallDoctorId');
@@ -455,12 +423,17 @@
         lastCallStatus = null;
     }
 
-    document.addEventListener('DOMContentLoaded', initPatientCallListener);
+    // Expose for router SPA navigation
+    window.initPatientCallListener = initPatientCallListener;
+    window.initPage = initPatientCallListener;
 
     if (typeof module !== 'undefined') module.exports = { initPatientCallListener };
+
+    // Auto-run on first hard load
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', initPatientCallListener);
     } else {
-        init();
+        initPatientCallListener();
     }
+
 })();

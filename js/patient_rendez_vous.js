@@ -1,6 +1,5 @@
 (function () {
 
-
     let appointments = [];
     let activeFilters = {
         media: '',
@@ -28,13 +27,27 @@
 
         await loadAppointments();
         setupFilters();
+        setupTabs();
         highlightCurrentSidebarLink();
 
         setInterval(() => {
             renderAppointments();
             updateBadge();
         }, 60000);
-    };
+    }
+
+    function setupTabs() {
+        const tabs = document.querySelectorAll('.rdv-tab');
+        const contents = document.querySelectorAll('.rdv-tab-content');
+        tabs.forEach((tab, index) => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                contents.forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                contents[index].classList.add('active');
+            });
+        });
+    }
 
     function setupFilters() {
         const mediaFilter = document.getElementById('filterMedia');
@@ -128,15 +141,9 @@
 
         const now = new Date();
 
-        let upcomingAppointments = appointments.filter(apt => {
-            return !isAppointmentInHistory(apt, now);
-        });
+        let upcomingAppointments = appointments.filter(apt => !isAppointmentInHistory(apt, now));
+        let pastAppointments = appointments.filter(apt => isAppointmentInHistory(apt, now));
 
-        let pastAppointments = appointments.filter(apt => {
-            return isAppointmentInHistory(apt, now);
-        });
-
-        // Apply upcoming filters
         if (activeFilters.media) {
             upcomingAppointments = upcomingAppointments.filter(apt => apt.mediaType === activeFilters.media);
         }
@@ -144,12 +151,13 @@
             upcomingAppointments = upcomingAppointments.filter(apt => apt.status === activeFilters.status);
         }
 
-        // Apply history filters
         if (activeFilters.dateRange) {
             pastAppointments = filterByDateRange(pastAppointments, activeFilters.dateRange);
         }
         if (activeFilters.doctor) {
-            pastAppointments = pastAppointments.filter(apt => apt.doctor?.fullname?.toLowerCase().includes(activeFilters.doctor.toLowerCase()));
+            pastAppointments = pastAppointments.filter(apt =>
+                apt.doctor?.fullname?.toLowerCase().includes(activeFilters.doctor.toLowerCase())
+            );
         }
 
         tbody.innerHTML = upcomingAppointments.length === 0
@@ -188,14 +196,15 @@
         <tr>
             <td><span class="media-badge">${mediaIcon} ${mediaLabel}</span></td>
             <td><strong>${doctorName}</strong></td>
-            <td><div style="display: flex; flex-direction: column;"><span>${dateStr}</span><span style="color: #888; font-size: 12px;">${apt.appointmentTime}</span></div></td>
-            <td style="color: #888;">${formatDate(apt.createdAt)}</td>
+            <td><div style="display:flex;flex-direction:column;"><span>${dateStr}</span><span style="color:#888;font-size:12px;">${apt.appointmentTime}</span></div></td>
+            <td style="color:#888;">${formatDate(apt.createdAt)}</td>
             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
             <td>
-                ${apt.status === 'pending' ? `<button class="action-btn danger" onclick="cancelAppointment('${apt.id}')">Annuler</button>` : '<span style="color: #ccc;">-</span>'}
+                ${apt.status === 'pending'
+                ? `<button class="action-btn danger" onclick="cancelAppointment('${apt.id}')">Annuler</button>`
+                : '<span style="color:#ccc;">-</span>'}
             </td>
-        </tr>
-    `;
+        </tr>`;
     }
 
     function renderHistoryRow(apt) {
@@ -210,12 +219,11 @@
         <tr>
             <td><span class="media-badge">${mediaIcon} ${mediaLabel}</span></td>
             <td><strong>${doctorName}</strong></td>
-            <td><div style="display: flex; flex-direction: column;"><span>${dateStr}</span><span style="color: #888; font-size: 12px;">${apt.appointmentTime}</span></div></td>
-            <td style="color: #888;">${formatDate(apt.createdAt)}</td>
+            <td><div style="display:flex;flex-direction:column;"><span>${dateStr}</span><span style="color:#888;font-size:12px;">${apt.appointmentTime}</span></div></td>
+            <td style="color:#888;">${formatDate(apt.createdAt)}</td>
             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-            <td style="color: #666; font-size: 13px;">${apt.notes || '<span style="color: #ccc;">-</span>'}</td>
-        </tr>
-    `;
+            <td style="color:#666;font-size:13px;">${apt.notes || '<span style="color:#ccc;">-</span>'}</td>
+        </tr>`;
     }
 
     function getStatusClass(status) {
@@ -257,16 +265,15 @@
     }
 
     function updateBadge() {
-        const pendingCount = appointments.filter(apt => apt.status === 'pending' && !isAppointmentInHistory(apt)).length;
+        const pendingCount = appointments.filter(apt =>
+            apt.status === 'pending' && !isAppointmentInHistory(apt)
+        ).length;
         const badge = document.querySelector('.nav-item[href="patient_rendez_vous.html"] .badge');
-        if (badge) {
-            badge.textContent = pendingCount;
-        }
+        if (badge) badge.textContent = pendingCount;
     }
 
     async function cancelAppointment(appointmentId) {
         if (!confirm('Êtes-vous sûr de vouloir annuler ce rendez-vous?')) return;
-
         try {
             await appointmentAPI.cancel(appointmentId);
             showToast('Rendez-vous annulé', 'success');
@@ -277,23 +284,15 @@
     }
 
     window.cancelAppointment = cancelAppointment;
-    // highlightCurrentSidebarLink removed — use global from api.js
 
+    // Expose initPage for the router (SPA navigation re-execution)
+    window.initPage = initPage;
 
-    const tabs = document.querySelectorAll('.rdv-tab');
-    const contents = document.querySelectorAll('.rdv-tab-content');
-
-    tabs.forEach((tab, index) => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            contents.forEach(c => c.classList.remove('active'));
-            tab.classList.add('active');
-            contents[index].classList.add('active');
-        });
-    });
+    // Auto-run on first hard load
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', initPage);
     } else {
-        init();
+        initPage();
     }
+
 })();
